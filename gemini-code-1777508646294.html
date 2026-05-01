@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4レーン 音ゲー譜面エディタ</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            font-size: 24px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .controls {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 300px;
+            position: sticky;
+            top: 20px;
+        }
+        .controls label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .controls input[type="text"],
+        .controls input[type="number"] {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        .file-input-wrapper {
+            margin-top: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #ccc;
+        }
+        .controls button {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+        .editor-wrapper {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            padding-bottom: 10px;
+            z-index: 10;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .color-box {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+        }
+        #editor {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background-color: #ddd;
+            padding: 2px;
+            border: 2px solid #999;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            background-color: #fff;
+        }
+        .beat-label {
+            width: 60px;
+            text-align: right;
+            padding-right: 10px;
+            font-size: 12px;
+            color: #666;
+            user-select: none;
+        }
+        .lane-container {
+            display: flex;
+            gap: 2px;
+            background-color: #ddd;
+        }
+        .note-cell {
+            width: 50px;
+            height: 30px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .note-cell[data-type="0"] { background-color: #fafafa; }
+        .note-cell[data-type="1"] { background-color: #4da6ff; }
+        .note-cell[data-type="2"] { background-color: #66cc66; }
+        
+        .row:nth-child(4n) {
+            border-bottom: 2px solid #999;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>譜面エディタ</h1>
+
+    <div class="container">
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <label>譜面を読み込む (JSON)</label>
+                <!-- onclick="this.value = null;" を追加し、選択状態を維持しつつ再選択可能に修正 -->
+                <input type="file" id="file-import" accept=".json" style="margin-top: 5px; width: 100%;" onclick="this.value = null;">
+            </div>
+
+            <h3>プロパティ設定</h3>
+            <label>曲名 (name)</label>
+            <input type="text" id="prop-name" value="かわいいだけじゃだめですか？">
+            
+            <label>BPM (bpm)</label>
+            <input type="number" id="prop-bpm" value="172">
+            
+            <label>曲の長さ (length / 四分音符数)</label>
+            <input type="number" id="prop-length" value="706">
+            
+            <label>プレカウント (pre_count)</label>
+            <input type="number" id="prop-precount" value="2">
+
+            <button id="btn-draw" style="background-color: #6c757d;">グリッドを再描画</button>
+            <button id="btn-export" style="margin-top: 30px;">JSON形式で保存</button>
+        </div>
+
+        <div class="editor-wrapper">
+            <div class="legend">
+                <div class="legend-item"><div class="color-box" style="background: #fafafa;"></div> 0: なし</div>
+                <div class="legend-item"><div class="color-box" style="background: #4da6ff;"></div> 1: タップ</div>
+                <div class="legend-item"><div class="color-box" style="background: #66cc66;"></div> 2: ロング</div>
+                <span>※セルをクリックで切り替え</span>
+            </div>
+            
+            <div id="editor"></div>
+        </div>
+    </div>
+
+    <script>
+        function drawGrid() {
+            const length = parseInt(document.getElementById('prop-length').value) || 100;
+            const editorDiv = document.getElementById('editor');
+            editorDiv.innerHTML = '';
+
+            for (let i = length; i >= 1; i--) {
+                const row = document.createElement('div');
+                row.className = 'row';
+                row.id = 'row_' + i;
+
+                const label = document.createElement('div');
+                label.className = 'beat-label';
+                label.textContent = 'beat_' + i;
+                row.appendChild(label);
+
+                const laneContainer = document.createElement('div');
+                laneContainer.className = 'lane-container';
+
+                for (let j = 0; j < 4; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'note-cell';
+                    cell.dataset.type = "0";
+                    cell.dataset.beat = i;
+                    cell.dataset.lane = j;
+
+                    cell.addEventListener('mousedown', function() {
+                        let currentType = parseInt(this.dataset.type);
+                        let nextType = (currentType + 1) % 3;
+                        this.dataset.type = nextType.toString();
+                    });
+
+                    laneContainer.appendChild(cell);
+                }
+                row.appendChild(laneContainer);
+                editorDiv.appendChild(row);
+            }
+        }
+
+        function exportJSON() {
+            const name = document.getElementById('prop-name').value;
+            const bpm = parseInt(document.getElementById('prop-bpm').value) || 120;
+            const length = parseInt(document.getElementById('prop-length').value) || 100;
+            const preCount = parseInt(document.getElementById('prop-precount').value) || 2;
+
+            const jsonOutput = {
+                property: {
+                    name: name,
+                    bpm: bpm,
+                    length: length,
+                    pre_count: preCount
+                },
+                notes: {}
+            };
+
+            for (let i = 1; i <= length; i++) {
+                const cells = document.querySelectorAll(`.note-cell[data-beat="${i}"]`);
+                if (cells.length === 4) {
+                    const noteStr = Array.from(cells).map(cell => cell.dataset.type).join('');
+                    if (noteStr !== "0000") {
+                        jsonOutput.notes[`beat_${i}`] = noteStr;
+                    }
+                }
+            }
+
+            const jsonString = JSON.stringify(jsonOutput, null, 4);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${name || 'score'}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.property) {
+                        document.getElementById('prop-name').value = data.property.name || '';
+                        document.getElementById('prop-bpm').value = data.property.bpm || '';
+                        document.getElementById('prop-length').value = data.property.length || '';
+                        document.getElementById('prop-precount').value = data.property.pre_count || '';
+                    }
+
+                    drawGrid();
+
+                    if (data.notes) {
+                        for (const key in data.notes) {
+                            const match = key.match(/^beat_(\d+)$/);
+                            if (match) {
+                                const beatNum = match[1];
+                                const noteStr = data.notes[key];
+                                
+                                if (noteStr.length === 4) {
+                                    for (let lane = 0; lane < 4; lane++) {
+                                        const noteType = noteStr[lane];
+                                        const cell = document.querySelector(`.note-cell[data-beat="${beatNum}"][data-lane="${lane}"]`);
+                                        if (cell && (noteType === '0' || noteType === '1' || noteType === '2')) {
+                                            cell.dataset.type = noteType;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    alert('譜面の読み込みが完了しました。');
+                } catch (error) {
+                    console.error("JSONパースエラー:", error);
+                    alert('ファイルの読み込みに失敗しました。正しいJSONフォーマットか確認してください。');
+                }
+                
+                // 修正箇所：ここにあった event.target.value = ''; を削除しました
+            };
+            
+            reader.readAsText(file);
+        }
+
+        document.getElementById('btn-draw').addEventListener('click', drawGrid);
+        document.getElementById('btn-export').addEventListener('click', exportJSON);
+        document.getElementById('file-import').addEventListener('change', importJSON);
+
+        window.onload = drawGrid;
+    </script>
+</body>
+</html>
