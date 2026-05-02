@@ -140,13 +140,16 @@
         <div class="controls">
             <div class="file-input-wrapper">
                 <label>譜面を読み込む (JSON)</label>
-                <!-- onclick="this.value = null;" を追加し、選択状態を維持しつつ再選択可能に修正 -->
                 <input type="file" id="file-import" accept=".json" style="margin-top: 5px; width: 100%;" onclick="this.value = null;">
             </div>
 
             <h3>プロパティ設定</h3>
             <label>曲名 (name)</label>
             <input type="text" id="prop-name" value="かわいいだけじゃだめですか？">
+
+            <!-- youtubeIdの入力欄を追加 -->
+            <label>YouTube ID (youtubeId)</label>
+            <input type="text" id="prop-youtubeId" value="" placeholder="例: dQw4w9WgXcQ">
             
             <label>BPM (bpm)</label>
             <input type="number" id="prop-bpm" value="172">
@@ -214,6 +217,7 @@
 
         function exportJSON() {
             const name = document.getElementById('prop-name').value;
+            const youtubeId = document.getElementById('prop-youtubeId').value; // youtubeIdを取得
             const bpm = parseInt(document.getElementById('prop-bpm').value) || 120;
             const length = parseInt(document.getElementById('prop-length').value) || 100;
             const preCount = parseInt(document.getElementById('prop-precount').value) || 2;
@@ -221,6 +225,7 @@
             const jsonOutput = {
                 property: {
                     name: name,
+                    youtubeId: youtubeId, // JSONにyoutubeIdを追加
                     bpm: bpm,
                     length: length,
                     pre_count: preCount
@@ -262,6 +267,7 @@
                     
                     if (data.property) {
                         document.getElementById('prop-name').value = data.property.name || '';
+                        document.getElementById('prop-youtubeId').value = data.property.youtubeId || ''; // youtubeIdを反映
                         document.getElementById('prop-bpm').value = data.property.bpm || '';
                         document.getElementById('prop-length').value = data.property.length || '';
                         document.getElementById('prop-precount').value = data.property.pre_count || '';
@@ -293,8 +299,6 @@
                     console.error("JSONパースエラー:", error);
                     alert('ファイルの読み込みに失敗しました。正しいJSONフォーマットか確認してください。');
                 }
-                
-                // 修正箇所：ここにあった event.target.value = ''; を削除しました
             };
             
             reader.readAsText(file);
